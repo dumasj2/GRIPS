@@ -3,11 +3,13 @@ import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 function MapView() {
+  const [distance, setDistance] = useState("");
+  const [address, setAddress] = useState("");
   const [coords, setCoords] = useState(null);
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
-      console.log("Geolocation is not supported by this browser.");
+      console.log("Geolocation not supported");
       return;
     }
 
@@ -21,7 +23,7 @@ function MapView() {
         setCoords({ latitude, longitude });
       },
       (error) => {
-        console.error("Error getting location:", error.message);
+        console.error(error);
       }
     );
   };
@@ -32,18 +34,35 @@ function MapView() {
         Map View
       </h1>
 
-      {/* Button */}
-      <button
-        onClick={handleGetLocation}
-        className="mb-4 px-4 py-2 bg-blue-600 text-white rounded"
-      >
-        Get My Location
-      </button>
+      {/* Input Form */}
+      <div className="mb-6 flex flex-col gap-4 max-w-md">
+        <input
+          type="number"
+          placeholder="Distance (miles)"
+          value={distance}
+          onChange={(e) => setDistance(e.target.value)}
+          className="border p-2 rounded"
+        />
 
-      {/* Optional debug display */}
+        <button
+          onClick={handleGetLocation}
+          className="px-4 py-2 bg-blue-600 text-white rounded"
+        >
+          Use My Location
+        </button>
+
+        <input
+          type="text"
+          placeholder="Or enter an address"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          className="border p-2 rounded"
+        />
+      </div>
+
       {coords && (
         <p className="mb-4">
-          Lat: {coords.latitude}, Lng: {coords.longitude}
+          Current Location: {coords.latitude}, {coords.longitude}
         </p>
       )}
 
@@ -53,7 +72,7 @@ function MapView() {
         style={{ height: "600px", width: "100%" }}
       >
         <TileLayer
-          attribution='&copy; OpenStreetMap contributors'
+          attribution="&copy; OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
       </MapContainer>
