@@ -4,10 +4,14 @@ import networkx as nx
 from shapely.wkb import loads
 import matplotlib.pyplot as plt
 import folium
+from  shapely import LineString
+from geopy.distance import geodesic
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def load_osm_graph():
     db_url = os.environ.get("DATABASE_URL")
-    osmium_box = os.environ.get("OSMIUM_BBOX")
 
     conn = psycopg2.connect(db_url)
     cursor = conn.cursor()
@@ -30,16 +34,29 @@ def load_osm_graph():
             num_cords = len(cords) - 1
             
             for i in range(num_cords):
-                u = cords[i]
-                v = cords[i+1]
+                u = (round(cords[i][0],6), round(cords[i][1],6))
+                v = (round(cords[i+1][0],6), round(cords[i+1][1],6))
+                                
+                penalty = 1.0
                 
-                segment_weight = length_m / num_cords
+                if highway_type in ['footway', 'path', 'pedestrian', 'living_street', 'residential']:
+                    #reward
+                    penalty = .75
+                elif highway_type in ['primary', 'secondary', 'trunk']:
+                    # Severe penalty
+                    penalty = 5.0
+                elif highway_type in ['steps']:
+                    # Moderate penalty
+                    penalty = 2.0
+                
+                adjusted_weight = length_m * penalty
                 
                 G.add_edge( u, v,
                            osm_id=osm_id,
                            name=name or "Unknown",
                            highway_type=highway_type,
-                           weight=segment_weight,
+                           distance_in_meters = length_m,
+                           weight=adjusted_weight,
                            )
     cursor.close()        
     conn.close()
@@ -51,10 +68,11 @@ if __name__ == "__main__":
     pos = {node: node for node in graph.nodes()}
     plt.figure(figsize=(13,13))
     
-    sample_node_a = graph.nodes[100]
-    sample_node_b = graph.nodes[500]
-
-    
+    osm_box =  os.environ.get("OSMIUM_BBOX")
+    cords = list(map(float, osm_box.split(",")))
+    center = ((cords[1] + cords[3]) /2, (cords[0] + cords[2]) / 2)
+    calc_dist = geodesic(center, (cords[1], cords[0])).meters
+    print(f" Geopy Results: Origin Point {center} & Distace from center to edge: {calc_dist}")
     
     nx.draw(graph, pos= pos, node_size=0, width= 0.5)
     plt.show()
