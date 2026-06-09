@@ -1,15 +1,18 @@
 import { useState } from "react";
-import { MapContainer, TileLayer } from "react-leaflet";
+import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
 function MapView() {
   const [distance, setDistance] = useState("");
   const [address, setAddress] = useState("");
   const [coords, setCoords] = useState(null);
+  const [route, setRoute] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
-      console.log("Geolocation not supported");
+      setError("Geolocation is not supported by this browser.");
       return;
     }
 
@@ -21,11 +24,61 @@ function MapView() {
         console.log("Longitude:", longitude);
 
         setCoords({ latitude, longitude });
+        setError("");
       },
-      (error) => {
-        console.error(error);
+      (err) => {
+        setError(err.message);
       }
     );
+  };
+
+  const handleGenerateRoute = async () => {
+    setError("");
+
+    // Frontend validation
+    if (!distance || Number(distance) <= 0) {
+      setError("Please enter a valid distance.");
+      return;
+    }
+
+    if (!coords) {
+      setError("Please use your location first.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch(
+        "https://grips.onrender.com/route",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            distance_miles: Number(distance),
+            lat: coords.latitude,
+            lng: coords.longitude,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      console.log("Route data:", data);
+
+      setRoute(data);
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -34,7 +87,6 @@ function MapView() {
         Map View
       </h1>
 
-      {/* Input Form */}
       <div className="mb-6 flex flex-col gap-4 max-w-md">
         <input
           type="number"
@@ -58,11 +110,25 @@ function MapView() {
           onChange={(e) => setAddress(e.target.value)}
           className="border p-2 rounded"
         />
+
+        <button
+          onClick={handleGenerateRoute}
+          disabled={loading}
+          className="px-4 py-2 bg-green-600 text-white rounded"
+        >
+          {loading ? "Generating Route..." : "Generate Route"}
+        </button>
       </div>
 
       {coords && (
         <p className="mb-4">
-          Current Location: {coords.latitude}, {coords.longitude}
+          Location: {coords.latitude}, {coords.longitude}
+        </p>
+      )}
+
+      {error && (
+        <p className="mb-4 text-red-600">
+          Error: {error}
         </p>
       )}
 
@@ -75,6 +141,16 @@ function MapView() {
           attribution="&copy; OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        {route && (
+          <GeoJSON
+            data={route}
+            style={{
+              color: "blue",
+              weight: 5,
+              opacity: 0.8,
+            }}
+          />
+        )}
       </MapContainer>
     </div>
   );
