@@ -95,21 +95,22 @@ function MapView() {
           onChange={(e) => setDistance(e.target.value)}
           className="border p-2 rounded"
         />
-
-        <button
-          onClick={handleGetLocation}
-          className="px-4 py-2 bg-blue-600 text-white rounded"
-        >
-          Use My Location
-        </button>
-
-        <input
-          type="text"
-          placeholder="Or enter an address"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          className="border p-2 rounded"
-        />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleGetLocation}
+            className="px-4 py-2 bg-blue-600 text-white rounded"
+          >
+            Use My Location
+          </button>
+          or
+          <input
+            type="text"
+            placeholder="Or enter an address"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            className="border p-2 rounded"
+          />
+        </div>
 
         <button
           onClick={handleGenerateRoute}
