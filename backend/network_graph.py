@@ -16,8 +16,9 @@ def load_osm_graph():
     conn = psycopg2.connect(db_url)
     cursor = conn.cursor()
     
-    query = """SELECT osm_id, name, highway, way,
-                ST_Length(ST_Transform(way, 6491)) as length_meters
+    query = """SELECT osm_id, name, highway, 
+                ST_AsHEXEWKB(ST_Transform(way, 4326)) as way,
+                ST_Length(ST_Transform(way, 6492)) as length_meters
             FROM planet_osm_line
             WHERE highway is not NULL
             """
@@ -36,7 +37,9 @@ def load_osm_graph():
             for i in range(num_cords):
                 u = (round(cords[i][0],6), round(cords[i][1],6))
                 v = (round(cords[i+1][0],6), round(cords[i+1][1],6))
-                                
+
+                segment_length = geodesic((u[1], u[0]), (v[1], v[0])).meters
+
                 penalty = 1.0
                 
                 if highway_type in ['footway', 'path', 'pedestrian', 'living_street', 'residential']:
@@ -55,7 +58,7 @@ def load_osm_graph():
                            osm_id=osm_id,
                            name=name or "Unknown",
                            highway_type=highway_type,
-                           distance_in_meters = length_m,
+                           distance_in_meters = segment_length,
                            weight=adjusted_weight,
                            )
     cursor.close()        
