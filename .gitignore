@@ -1,4 +1,10 @@
 venv/
 backend/.env
 backend/__pycache__/
+backend/data/valhalla_tiles/
+backend/data/admin_data/
+backend/data/timezone_data/
+backend/data/*.txt
+
 .env
+
