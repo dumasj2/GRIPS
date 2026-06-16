@@ -11,7 +11,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://grips-beta.vercel.app/",
+        "https://grips-beta.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -113,3 +113,22 @@ def create_route(req: RouteRequest):
     }
 
     return geojson
+
+@app.get("/routes/db")
+def get_route_from_db():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT ST_AsGeoJSON(geom)
+        FROM routes
+        LIMIT 1;
+    """)
+
+    row = cursor.fetchone()
+
+    return {
+        "type": "Feature",
+        "geometry": json.loads(row[0]),
+        "properties": {}
+    }
