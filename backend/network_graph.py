@@ -52,7 +52,7 @@ def load_osm_graph():
                     # Moderate penalty
                     penalty = 2.0
                 
-                adjusted_weight = length_m * penalty
+                adjusted_weight = segment_length * penalty
                 
                 G.add_edge( u, v,
                            osm_id=osm_id,
@@ -76,7 +76,8 @@ if __name__ == "__main__":
     center = ((cords[1] + cords[3]) /2, (cords[0] + cords[2]) / 2)
     calc_dist = geodesic(center, (cords[1], cords[0])).meters
     print(f" Geopy Results: Origin Point {center} & Distace from center to edge: {calc_dist}")
-    
+
     nx.draw(graph, pos= pos, node_size=0, width= 0.5)
     plt.show()
+
     
