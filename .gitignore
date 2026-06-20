@@ -5,6 +5,7 @@ backend/data/valhalla_tiles/
 backend/data/admin_data/
 backend/data/timezone_data/
 backend/data/*.txt
+backend/ma-osm/
 
 .env
-
+route_preview.html

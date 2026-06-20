@@ -8,28 +8,28 @@ import requests
 from sklearn.neighbors import KDTree
 import polyline
 import os
-
+from shapely import LineString, convex_hull
 import network_graph
+import numpy as np
 
 load_dotenv()
 VALHALLA_BASE_URL = os.environ.get("VALHALLA_URL")
 
 METERS_IN_A_MILE = 1609.34
 EARTH_RADIUS_IN_M = 6371008
-W_PEDESTRIAN_BOSTON = 1.25
 
 
 def generate_route(G: nx, start: Tuple[float, float], miles: float):
-    # start is given as lon, Lat
 
+    # start is given as lon, Lat
     # Convert Miles to meters
     target_meters = miles * METERS_IN_A_MILE
-    waypoint_meters = target_meters / (3.0 * W_PEDESTRIAN_BOSTON)
+    waypoint_meters = target_meters / (3.0 * get_w_pedestrian_boston(miles))
     start_node = find_starting_node(G, start)
     if not start_node:
         raise ValueError(f"Invalid Coordinates Given: {start}")
 
-    waypoint_node = find_waypoint(G, start, waypoint_meters)
+    waypoint_node, waypoint_angle = find_waypoint(G, start, waypoint_meters)
     if waypoint_node is None:
         raise ValueError(f"Could not find suitable waypoint")
 
@@ -42,8 +42,43 @@ def generate_route(G: nx, start: Tuple[float, float], miles: float):
             node_list.append(node)
 
     route = valhalla_route(node_list)
-
     result = valhalla_to_geojson(route)
+    grade = route_grader(result, target_meters)
+
+    best_grade = grade
+    best_result = result
+    best_tri_list = tri_list
+
+    acceptable_error = 20.0
+    illegal_angles = [waypoint_angle]
+
+    # 360 / 15 = 24. Consider adjusting depedning on number of angle orientations
+    while best_grade > acceptable_error and len(illegal_angles) < 12:
+
+        next_waypoint, next_angle = find_waypoint(
+            G, start, waypoint_meters, illegal_angles
+        )
+        if next_waypoint is None:
+            break
+
+        illegal_angles.append(next_angle)
+
+        new_tri_list = create_triangle_nodes(G, start, next_waypoint, target_meters)
+
+        node_list = [new_tri_list[0]]
+        for node in new_tri_list[1:]:
+            if node != node_list[-1]:
+                node_list.append(node)
+
+        new_route = valhalla_route(node_list)
+        new_result = valhalla_to_geojson(new_route)
+
+        new_grade = route_grader(new_result, target_meters)
+
+        if new_grade < best_grade:
+            best_grade = new_grade
+            best_result = new_result
+            best_tri_list = new_tri_list
 
     print(
         f"Route distance: "
@@ -54,7 +89,12 @@ def generate_route(G: nx, start: Tuple[float, float], miles: float):
         f"Coordinate count: " f"{len(result['features'][0]['geometry']['coordinates'])}"
     )
 
-    return result, tri_list
+    print(
+        f"Grade: " f"{best_grade}"
+    )
+
+
+    return best_result, best_tri_list
 
 
 def valhalla_route(node_list: List[Tuple[float, float]]):
@@ -100,15 +140,29 @@ def valhalla_route(node_list: List[Tuple[float, float]]):
         raise RuntimeError(f"Routing engine unreachable: {e}")
 
 
-def find_waypoint(G: nx, start: Tuple, disatnce: float):
+def get_w_pedestrian_boston(dist_in_miles: float):
+    match dist_in_miles:
+        case m if m >= 3:
+            return 1.15
+        case n if n >= 2:
+            return 1.20
+        case l if l >= 1:
+            return 1.30
+        case _:
+            return 1.40
 
-    angles = list(range(0, 360, 20))
 
+def find_waypoint(G: nx, start: Tuple, disatnce: float, skip_angles: List[int] = None):
+
+    if skip_angles is None:
+        skip_angles = []
+
+    angles = [a for a in range(0, 360, 15) if a not in skip_angles]
     random.shuffle(angles)
 
     best_node = None
     best_dis = float("inf")
-
+    best_angle = -1
     start_node = find_starting_node(G, start)
     print(f" Start Node: {start_node}")
 
@@ -116,25 +170,32 @@ def find_waypoint(G: nx, start: Tuple, disatnce: float):
         projected_point = project_point(start, angle, disatnce)
         projected_node = find_starting_node(G, projected_point)
         print(f" angle= {angle}, projected={projected_point}, node= {projected_node}")
-
         if projected_node == start_node:
             print(" -> same as start, skipping")
             continue
-
         try:
             path_length = Haversine_Distance(start_node, projected_node)
             err = abs(path_length - disatnce)
-            print(f"  -> path_length{err}")
+            print(f" -> path_length{err}")
             if err < best_dis:
                 best_node = projected_node
                 best_dis = err
-
+                best_angle = angle
         except nx.NetworkXNoPath:
             continue
         except Exception as e:
-            print(f"  -> failed: {e}")
+            print(f" -> failed: {e}")
+   
+    print(
+        "Projected:",
+        projected_point,
+        "Actual:",
+        projected_node,
+        "Snap:",
+        Haversine_Distance(projected_point, projected_node)
+    )
 
-    return best_node
+    return best_node, best_angle
 
 
 def create_triangle_nodes(
@@ -150,7 +211,7 @@ def create_triangle_nodes(
     # Chord and flank offset distance
     chord_m = Haversine_Distance(start, end)
     flank_offset = chord_m * 0.35
-    
+
     # Left and right flank points (perpendicular)
     one = (start[0] + dx * 0.33, start[1] + dy * 0.33)
     two = (start[0] + dx * 0.66, start[1] + dy * 0.66)
@@ -192,7 +253,7 @@ def project_point(node: Tuple[float, float], angle: float, distance: float):
     return ((lon + math.degrees(dlon)), (lat + math.degrees(dlat)))
 
 
-def valhalla_to_geojson(valhalla_response):
+def valhalla_to_geojson(valhalla_response: dict):
     if not valhalla_response or "trip" not in valhalla_response:
         return {}
 
@@ -239,6 +300,38 @@ def Haversine_Distance(p1: Tuple[float, float], p2: Tuple[float, float]):
     )
     c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
     return EARTH_RADIUS_IN_M * c
+
+
+def route_grader(route: dict, target_distance: float):
+    # Criteria: target distance error + connectivity
+    actual_distance = route["features"][0]["properties"].get("distance_meters", 0)
+    dist_err = (
+        abs(
+            (target_distance - actual_distance)
+            / ((target_distance + actual_distance) / 2)
+        )
+        * 100
+    )
+
+    # Connectivity: use Hull theory
+    coords = route["features"][0]["geometry"]["coordinates"]
+
+    lat_to_m = 111320.0
+    lon_to_m = 111320 * math.cos(math.radians(np.mean(coords)))
+    coords_m = [(cord[0] * lon_to_m, cord[1] * lat_to_m) for cord in coords]
+
+    convex_results = convex_hull(LineString(coords_m)).area
+    shape_penalty = 0
+
+    if convex_results <= 0:
+        shape_penalty = 100
+    else:
+        good_area = (actual_distance / (2 * math.pi)) ** 2 * math.pi
+        ratio = convex_results / good_area
+
+        shape_penalty = abs(1.0 - min(ratio, 1.0)) * 50
+
+    return dist_err + shape_penalty
 
 
 def visualize_route(route: dict, start: Tuple[float, float], tri_list: List = None):
@@ -294,7 +387,7 @@ if __name__ == "__main__":
     build_spatial_index(G)
 
     start_point = (-71.095, 42.336)  # (lon, lat)
-    target_miles = 1
+    target_miles = 3
     route, tri_list = generate_route(G, start_point, target_miles)
 
     visualize_route(route, start_point, tri_list=tri_list)
