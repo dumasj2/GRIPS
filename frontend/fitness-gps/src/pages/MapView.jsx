@@ -183,7 +183,7 @@ function MapView() {
 
   return (//This down makes all the UI visuals for the map view page
     <div className="p-6 bg-gray-500 min-h-screen">
-      <h1 className="text-3xl text-blue-900 ml-25 font-bold mb-4">
+      <h1 className="text-3xl text-blue-900 ml-22 font-bold mb-4">
         Map View
       </h1>
 
