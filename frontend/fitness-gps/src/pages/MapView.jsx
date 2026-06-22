@@ -176,9 +176,14 @@ function MapView() {
     });
   };
 
+  const bostonBounds = [
+    [42.2926, -71.1537], // southwest
+    [42.3794, -71.0363], // northeast
+  ];
+
   return (//This down makes all the UI visuals for the map view page
-    <div className="p-6">
-      <h1 className="text-3xl font-bold mb-4">
+    <div className="p-6 bg-gray-500 min-h-screen">
+      <h1 className="text-3xl text-blue-900 ml-35 font-bold mb-4">
         Map View
       </h1>
 
@@ -188,24 +193,26 @@ function MapView() {
           placeholder="Distance (miles)"
           value={distance}
           onChange={(e) => setDistance(e.target.value)}
-          className="border p-2 rounded"
+          className="border p-2 rounded border-blue-900 text-blue-900"
         />
-
-        Starting your run in a different location? Enter an address to update your starting point on the map:
+        <h1 className="text-blue-900 font-bold mb-4">
+          Starting your run in a different location? Enter an address to update your starting point on the map:
+        </h1>
+        
         <div className="flex items-center gap-2">
           <input
             type="text"
             placeholder="Enter an address"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            className="border p-2 rounded"
+            className="border p-2 rounded border-blue-900 text-blue-900"
           />
         </div>
 
         <button
           onClick={handleGenerateRoute}
           disabled={loading}
-          className="px-4 py-2 bg-green-600 text-white rounded"
+          className="px-4 py-2 bg-slate-300 text-blue-900 rounded"
         >
           {loading ? "Generating Route..." : "Generate Route"}
         </button>
@@ -222,16 +229,20 @@ function MapView() {
           Error: {error}
         </p>
       )}
-
+      <div className="border-8 border-blue-900 rounded-xl overflow-hidden shadow-lg">
       <MapContainer
-        center={[42.3601, -71.0589]}// When first going to the map view page, the map will be centered on Central Boston
-        zoom={13}
+        center={[42.336, -71.095]}
+        zoom={15}
+        minZoom={13}
+        maxBounds={bostonBounds}
+        maxBoundsViscosity={1.0}
         style={{ height: "600px", width: "100%" }}
       >
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        
         {coords && (
           <CircleMarker
             center={[
@@ -266,6 +277,7 @@ function MapView() {
           />
         )}
       </MapContainer>
+      </div>
     </div>
   );
 }
