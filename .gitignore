@@ -1,11 +1,30 @@
-venv/
+# Root dependencies and logs
+node_modules/
+package-lock.json
+route_preview.html
+
+# Frontend local environments
+frontend/fitness-gps/node_modules/
+frontend/fitness-gps/dist/
+frontend/fitness-gps/.env*
+
+# Backend Environment secrets
 backend/.env
-backend/__pycache__/
+
+# Python compilation caches
+**/__pycache__/
+*.pyc
+backend/venv/
+venv/
+
+# Raw OpenStreetMap Files (Stops large data blocks completely)
+backend/data/*.osm.pbf
+backend/ma-osm/
+
+# Compiled Valhalla Assets (Stops Git history bloat)
 backend/data/valhalla_tiles/
+backend/data/valhalla_tiles.tar
 backend/data/admin_data/
 backend/data/timezone_data/
 backend/data/*.txt
-backend/ma-osm/
-
-.env
-route_preview.html
+backend/*.pkl

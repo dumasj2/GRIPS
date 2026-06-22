@@ -18,6 +18,15 @@ VALHALLA_BASE_URL = os.environ.get("VALHALLA_URL")
 METERS_IN_A_MILE = 1609.34
 EARTH_RADIUS_IN_M = 6371008
 
+# TODO 1: Canidate Routes
+# TODO 1a:Generate 3 Routes
+# TODO 1b:Route Grader via shape + milage accuracy
+# TODO 2: Scale Milage better
+# TODO 3: Improve waypoint selection
+# TODO 3a: Esnure waypoint works at any node in the graph without failing waypoint finding
+# TODO 3b: Score waypoint via err and connectiveity
+# TODO 4: MVP ETA via segment meters over speedy type scaled by segment scalers via metadata for each segment
+# TODO 5: Score cost heuristic via distance + perference(derivied from metadata to manipulate Valhalla routing)
 
 def generate_route(G: nx, start: Tuple[float, float], miles: float):
 
@@ -53,7 +62,7 @@ def generate_route(G: nx, start: Tuple[float, float], miles: float):
     illegal_angles = [waypoint_angle]
 
     # 360 / 15 = 24. Consider adjusting depedning on number of angle orientations
-    while best_grade > acceptable_error and len(illegal_angles) < 12:
+    while best_grade > acceptable_error and len(illegal_angles) < 24:
 
         next_waypoint, next_angle = find_waypoint(
             G, start, waypoint_meters, illegal_angles
@@ -234,16 +243,6 @@ def find_starting_node(G: nx, start: Tuple[float, float]):
     nearest_index = indices[0][0]
     return G.graph["spatial_node_ids"][nearest_index]
 
-
-def build_spatial_index(G: nx):
-    node_ids = list(G.nodes())
-
-    node_list = [[n[0], n[1]] for n in node_ids]
-
-    G.graph["spatial_graph"] = KDTree(node_list)
-    G.graph["spatial_node_ids"] = node_ids
-
-
 def project_point(node: Tuple[float, float], angle: float, distance: float):
     lon, lat = node
     ang_rad = math.radians(angle)
@@ -384,10 +383,9 @@ def visualize_route(route: dict, start: Tuple[float, float], tri_list: List = No
 
 if __name__ == "__main__":
     G = network_graph.load_osm_graph()
-    build_spatial_index(G)
 
     start_point = (-71.095, 42.336)  # (lon, lat)
-    target_miles = 3
+    target_miles = 1.5
     route, tri_list = generate_route(G, start_point, target_miles)
 
     visualize_route(route, start_point, tri_list=tri_list)

@@ -3,10 +3,10 @@ import psycopg2
 import networkx as nx
 from shapely.wkb import loads
 import matplotlib.pyplot as plt
-import folium
 from  shapely import LineString
 from geopy.distance import geodesic
 from dotenv import load_dotenv
+from sklearn.neighbors import KDTree
 
 load_dotenv()
 
@@ -63,11 +63,21 @@ def load_osm_graph():
                            )
     cursor.close()        
     conn.close()
-    
+
+    build_spatial_index(G)
+
     return G
 
+def build_spatial_index(G: nx):
+    node_ids = list(G.nodes())
+
+    node_list = [[n[0], n[1]] for n in node_ids]
+
+    G.graph["spatial_graph"] = KDTree(node_list)
+    G.graph["spatial_node_ids"] = node_ids
+
 if __name__ == "__main__":
-    graph = load_osm_graph()
+    graph = load_osm_graph()    
     pos = {node: node for node in graph.nodes()}
     plt.figure(figsize=(13,13))
     
