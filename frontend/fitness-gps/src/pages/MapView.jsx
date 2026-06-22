@@ -9,6 +9,8 @@ function MapView() {
   const [route, setRoute] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [completedRoute, setCompletedRoute] = useState(null);
+  const [upcomingRoute, setUpcomingRoute] = useState(null);
 
   useEffect(() => {//constantly updates the user's location on the map
     if (!navigator.geolocation) {
@@ -47,6 +49,13 @@ function MapView() {
       navigator.geolocation.clearWatch(watchId);
     };
   }, []);
+
+  useEffect(() => {
+    if (!coords || !route) return;
+
+    updateRouteProgress();
+
+  }, [coords, route]);
 
   const handleGenerateRoute = async () => {
     setError("");
@@ -95,6 +104,75 @@ function MapView() {
     } finally {
       setLoading(false);
     }
+    const updateRouteProgress = () => {
+
+      const coordinates =
+        route.features[0].geometry.coordinates;
+
+      // Find the route point closest to the user
+      let closestIndex = 0;
+      let shortestDistance = Infinity;
+
+      coordinates.forEach((point, index) => {
+
+        const lng = point[0];
+        const lat = point[1];
+
+        const distance =
+          Math.sqrt(
+            (lat - coords.latitude) ** 2 +
+            (lng - coords.longitude) ** 2
+          );
+
+        if (distance < shortestDistance) {
+
+          shortestDistance = distance;
+
+          closestIndex = index;
+        }
+      });
+
+      const completed = coordinates.slice(
+        0,
+        closestIndex + 1
+      );
+
+      const upcoming = coordinates.slice(
+        closestIndex
+      );
+
+      setCompletedRoute({
+        type: "FeatureCollection",
+
+        features: [
+          {
+            type: "Feature",
+
+            geometry: {
+              type: "LineString",
+
+              coordinates: completed,
+            },
+          },
+        ],
+      });
+
+      setUpcomingRoute({
+        type: "FeatureCollection",
+
+        features: [
+          {
+            type: "Feature",
+
+            geometry: {
+              type: "LineString",
+
+              coordinates: upcoming,
+            },
+          },
+        ],
+      });
+    };
   };
 
   return (//This down makes all the UI visuals for the map view page
@@ -167,13 +245,22 @@ function MapView() {
             }}
           />
         )}
-        {route && (
-          <GeoJSON// Renders the route
-            data={route}
+        {completedRoute && (
+          <GeoJSON
+            data={completedRoute}
+            style={{
+              color: "green",
+              weight: 6,
+            }}
+          />
+        )}
+
+        {upcomingRoute && (
+          <GeoJSON
+            data={upcomingRoute}
             style={{
               color: "blue",
-              weight: 5,
-              opacity: 0.8,
+              weight: 6,
             }}
           />
         )}
