@@ -186,7 +186,9 @@ function MapView() {
       <h1 className="text-3xl text-blue-900 ml-22 font-bold mb-4">
         Map View
       </h1>
-
+      <h1 className="text-blue-900 font-bold mb-4">
+        How many miles do you want to run?
+      </h1>
       <div className="mb-6 flex flex-col gap-4 max-w-md">
         <input
           type="number"
@@ -196,7 +198,7 @@ function MapView() {
           className="border p-2 rounded border-blue-900 text-blue-900"
         />
         <h1 className="text-blue-900 font-bold mb-4">
-          Starting your run in a different location? Enter an address to update your starting point on the map:
+          Starting your run in a different location? Enter an address to change your starting point on the map:
         </h1>
         
         <div className="flex items-center gap-2">
