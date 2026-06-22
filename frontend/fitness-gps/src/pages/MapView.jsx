@@ -186,10 +186,10 @@ function MapView() {
       <h1 className="text-3xl text-blue-900 ml-22 font-bold mb-4">
         Map View
       </h1>
-      <h1 className="text-blue-900 font-bold mb-4">
-        How many miles do you want to run?
-      </h1>
       <div className="mb-6 flex flex-col gap-4 max-w-md">
+        <h1 className="text-blue-900 font-bold mb-4">
+          How many miles do you want to run?
+        </h1>
         <input
           type="number"
           placeholder="Distance (miles)"
