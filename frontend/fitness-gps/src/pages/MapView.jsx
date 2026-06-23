@@ -75,7 +75,7 @@ function MapView() {
 
     try {
       const response = await fetch(
-        "https://grips.onrender.com/route",// Link to backend endpoint
+        "http://127.0.0.1:8000/route",// Link to backend endpoint
         {
           method: "POST",// Sends a post request to the backend
           headers: {
@@ -97,22 +97,8 @@ function MapView() {
 
       console.log("Route data:", data);// Sends the route data to console for debugging
       
-      // convert backend output → GeoJSON
-      const geojson = {
-        type: "FeatureCollection",
-        features: [
-          {
-            type: "Feature",
-            geometry: {
-              type: "LineString",
-              coordinates: data.route, // <-- IMPORTANT: adjust if needed
-            },
-            properties: {},
-          },
-        ],
-      };
 
-      setRoute(geojson);
+      setRoute(data.route);
     } catch (err) {
       console.error(err);
       setError(err.message);
