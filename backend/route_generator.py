@@ -46,12 +46,7 @@ def generate_route(G: nx, start: Tuple[float, float], miles: float):
     tri_list = create_triangle_nodes(G, start, waypoint_node, target_meters)
     print(f"Arc List: {tri_list}")
 
-    node_list = [tri_list[0]]
-    for node in tri_list[1:]:
-        if node != node_list[-1]:
-            node_list.append(node)
-
-    route = valhalla_route(node_list)
+    route = valhalla_route(tri_list)
     result = valhalla_to_geojson(route)
     grade = route_grader(result, target_meters)
 
@@ -75,12 +70,7 @@ def generate_route(G: nx, start: Tuple[float, float], miles: float):
 
         new_tri_list = create_triangle_nodes(G, start, next_waypoint, target_meters)
 
-        node_list = [new_tri_list[0]]
-        for node in new_tri_list[1:]:
-            if node != node_list[-1]:
-                node_list.append(node)
-
-        new_route = valhalla_route(node_list)
+        new_route = valhalla_route(new_tri_list)
         new_result = valhalla_to_geojson(new_route)
 
         new_grade = route_grader(new_result, target_meters)
@@ -185,7 +175,7 @@ def find_waypoint(G: nx, start: Tuple, disatnce: float, skip_angles: List[int] =
             print(" -> same as start, skipping")
             continue
         try:
-            path_length = Haversine_Distance(start_node, projected_node)
+            path_length = nx.dijkstra_path_length(G, start_node, projected_node, weight="weight")
             err = abs(path_length - disatnce)
             print(f" -> path_length{err}")
             if err < best_dis:
