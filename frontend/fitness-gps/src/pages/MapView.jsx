@@ -50,19 +50,19 @@ function MapView() {
     };
   }, []);
 
-  useEffect(() => {
+  useEffect(() => {// Updates the route progress whenever the user's location or the route changes
     if (!coords || !route) return;
 
     updateRouteProgress();
 
   }, [coords, route]);
 
-  const handleGenerateRoute = async () => {
+  const handleGenerateRoute = async () => {//Gets called when user clicks generate route button
     setError("");
 
     // Frontend validation
-    if (!distance || Number(distance) <= 0 || Number(distance) > 10) {
-      setError("Distance must be between 0 and 10 miles.");
+    if (!distance || Number(distance) <= 0 || Number(distance) > 6) {
+      setError("Distance must be between 0 and 6 miles.");
       return;
     }
     
@@ -73,9 +73,10 @@ function MapView() {
 
     setLoading(true);
 
-    try {
+    try {//The request send to the backend to generate a route
       const response = await fetch(
-        "http://127.0.0.1:8000/route",// Link to backend endpoint
+        "http://127.0.0.1:8000/route",// Link to backend on the local machine(Have only 1 uncommented)
+        //"https://grips.onrender.com/route",// Link to backend endpoint(Have only 1 uncommented)
         {
           method: "POST",// Sends a post request to the backend
           headers: {
@@ -97,8 +98,8 @@ function MapView() {
 
       console.log("Route data:", data);// Sends the route data to console for debugging
       
-
       setRoute(data.route);
+
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -107,7 +108,7 @@ function MapView() {
     }
   };
 
-  const updateRouteProgress = () => {
+  const updateRouteProgress = () => {//changes the color of the route on the map based on the user's location
 
     const coordinates =
       route.features[0].geometry.coordinates;
@@ -177,7 +178,7 @@ function MapView() {
     });
   };
 
-  const bostonBounds = [
+  const bostonBounds = [//Sets map boundaries
     [42.2926, -71.1537], // southwest
     [42.3794, -71.0363], // northeast
   ];
