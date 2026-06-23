@@ -1,8 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from database import connection
 from sqlalchemy import text
+
+import network_graph
+import route_generator
 
 app = FastAPI()
 
@@ -20,8 +23,18 @@ app.add_middleware(
 
 class RouteRequest(BaseModel):
     lat: float
-    lng: float
-    distance_miles: float
+    lon: float
+    miles: float = Field(gt=0, le=10)
+
+graph = None
+
+@app.on_event("startup")
+def startup_event():
+    global graph
+    print("Loading OSM graph...")
+    graph = network_graph.load_osm_graph()
+    network_graph.build_spatial_index(graph)
+    print("OSM graph loaded.")
 
 def validate_bounds(lat, lng):
     if not (42.30 <= lat <= 42.37 and -71.15 <= lng <= -71.05):
@@ -85,50 +98,52 @@ def get_routes():
 
 @app.post("/route")
 def create_route(req: RouteRequest):
-    if req.distance_miles <= 0:
-        raise HTTPException(status_code=422, detail="Distance must be greater than 0.")
+    validate_bounds(req.lat, req.lon)
 
-    # temporary fake loop near the input point
-    geojson = {
-        "type": "FeatureCollection",
-        "features": [
-            {
-                "type": "Feature",
-                "geometry": {
-                    "type": "LineString",
-                    "coordinates": [
-                        [req.lng, req.lat],
-                        [req.lng + 0.005, req.lat + 0.005],
-                        [req.lng + 0.01, req.lat],
-                        [req.lng, req.lat],
-                    ],
-                },
-                "properties": {
-                    "score": 75,
-                    "eta_minutes": round(req.distance_miles * 10),
-                    "distance_miles": req.distance_miles,
-                },
-            }
-        ],
-    }
+    if graph is None:
+        raise HTTPException(status_code=503, detail="Graph is not loaded yet.")
 
-    return geojson
+    try:
+        route_geojson, tri_list = route_generator.generate_route(
+            graph,
+            (req.lon, req.lat), 
+            req.miles
+        )
 
-@app.get("/routes/db")
-def get_route_from_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
+        return {
+            "route": route_geojson,
+            "triangle_points": tri_list,
+            "requested": {
+                "lat": req.lat,
+                "lon": req.lon,
+                "miles": req.miles,
+            },
+        }
 
-    cursor.execute("""
-        SELECT ST_AsGeoJSON(geom)
-        FROM routes
-        LIMIT 1;
-    """)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
-    row = cursor.fetchone()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
-    return {
-        "type": "Feature",
-        "geometry": json.loads(row[0]),
-        "properties": {}
-    }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Route generation failed: {e}")
+
+#@app.get("/routes/db")
+#def get_route_from_db():
+    #conn = get_db_connection()
+    #cursor = conn.cursor()
+
+    #cursor.execute("""
+        #SELECT ST_AsGeoJSON(geom)
+        #FROM routes
+        #LIMIT 1;
+    #""")
+
+    #row = cursor.fetchone()
+
+    #return {
+        #"type": "Feature",
+        #"geometry": json.loads(row[0]),
+        #"properties": {}
+    #}
