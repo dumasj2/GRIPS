@@ -61,8 +61,8 @@ function MapView() {
     setError("");
 
     // Frontend validation
-    if (!distance || Number(distance) <= 0) {
-      setError("Please enter a valid distance.");
+    if (!distance || Number(distance) <= 0 || Number(distance) > 10) {
+      setError("Distance must be between 0 and 10 miles.");
       return;
     }
     
@@ -82,9 +82,9 @@ function MapView() {
             "Content-Type": "application/json",// Specifies requested content type as JSON
           },
           body: JSON.stringify({// Expected body of the request
-            distance_miles: Number(distance),
             lat: coords.latitude,
-            lng: coords.longitude,
+            lon: coords.longitude,
+            miles: Number(distance)
           }),
         }
       );
@@ -184,9 +184,12 @@ function MapView() {
   return (//This down makes all the UI visuals for the map view page
     <div className="p-6 bg-gray-500 min-h-screen">
       <h1 className="text-3xl text-blue-900 ml-22 font-bold mb-4">
-        Map View
+        G.R.I.P.S.
       </h1>
       <div className="mb-6 flex flex-col gap-4 max-w-md">
+        <h1 className="text-blue-900 italic mb-4">
+          Global Runner Intelligent Positioning System
+        </h1>
         <h1 className="text-blue-900 font-bold mb-4">
           How many miles do you want to run?
         </h1>
