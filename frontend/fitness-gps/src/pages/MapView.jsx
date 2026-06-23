@@ -96,8 +96,23 @@ function MapView() {
       const data = await response.json();// Parse the response as JSON
 
       console.log("Route data:", data);// Sends the route data to console for debugging
+      
+      // convert backend output → GeoJSON
+      const geojson = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "LineString",
+              coordinates: data.route, // <-- IMPORTANT: adjust if needed
+            },
+            properties: {},
+          },
+        ],
+      };
 
-      setRoute(data);
+      setRoute(geojson);
     } catch (err) {
       console.error(err);
       setError(err.message);
