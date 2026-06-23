@@ -4,7 +4,7 @@ import random
 from dotenv import load_dotenv
 import folium
 import networkx as nx
-from typing import List, Tuple
+from typing import List, Literal, Tuple
 import requests
 from sklearn.neighbors import KDTree
 import polyline
@@ -107,26 +107,14 @@ def generate_route(G: nx, start: Tuple[float, float], miles: float):
     return best_result, best_tri_list
 
 
-def valhalla_route(node_list: List[Tuple[float, float]]):
+def valhalla_route(node_list: List[Tuple[float, float]], type: Literal["ROUTE", "TRACE"] = "ROUTE"):
 
     unique_pass = [node_list[0]]
     for i in node_list[1:]:
         if i != unique_pass[-1]:
             unique_pass.append(i)
 
-    locations = []
-
-    for i, node in enumerate(unique_pass):
-        dict = {"lat": node[1], "lon": node[0]}
-        if i == 0 or i == len(unique_pass) - 1:
-            dict["type"] = "break"
-        else:
-            dict["type"] = "through"
-
-        locations.append(dict)
-
     payload = {
-        "locations": locations,
         "costing": "pedestrian",
         "costing_options": {
             "pedestrian": {
@@ -134,12 +122,25 @@ def valhalla_route(node_list: List[Tuple[float, float]]):
                 "use_living_streets": 1,
                 "walkway_factor": 0.75,
                 "step_penalty": 5,
-                "alley_factor": 3,
+                "alley_factor": 0.1,
                 "u_turn_penalty": 100000,
+                "maneuver_penalty": 500
             }
         },
         "units": "kilometres",
     }
+
+    locations = []
+    if type == "ROUTE":
+        for i, node in enumerate(unique_pass):
+            dict = {"lat": node[1], "lon": node[0]}
+            if i == 0 or i == len(unique_pass) - 1:
+                dict["type"] = "break"
+            else:
+                dict["type"] = "through"
+
+            locations.append(dict)
+        payload["locations"] = locations
 
     try:
         response = requests.post(f"{VALHALLA_BASE_URL}/route", json=payload, timeout=20)
@@ -333,6 +334,10 @@ def route_grader(route: dict, target_distance: float):
 
     return dist_err + shape_penalty
 
+def eta(route: dict):
+    coords = route["features"][0]["geometry"]["coordinates"]
+
+
 
 def visualize_route(route: dict, start: Tuple[float, float], tri_list: List = None):
     if not route or not route.get("features"):
@@ -344,7 +349,6 @@ def visualize_route(route: dict, start: Tuple[float, float], tri_list: List = No
 
     center_lat = coords[len(coords) // 2][1]
     center_lon = coords[len(coords) // 2][0]
-
     m = folium.Map(location=[center_lat, center_lon], zoom_start=15)
 
     # route
