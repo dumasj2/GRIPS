@@ -1,4 +1,5 @@
 import math
+import pickle
 import random
 from dotenv import load_dotenv
 import folium
@@ -382,8 +383,9 @@ def visualize_route(route: dict, start: Tuple[float, float], tri_list: List = No
 
 
 if __name__ == "__main__":
-    G = network_graph.load_osm_graph()
-
+    with open("data/network_cache.pkl", "rb") as f:
+        G = pickle.load(f)
+    
     start_point = (-71.095, 42.336)  # (lon, lat)
     target_miles = 1.5
     route, tri_list = generate_route(G, start_point, target_miles)

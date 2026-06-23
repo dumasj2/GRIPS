@@ -7,6 +7,8 @@ from  shapely import LineString
 from geopy.distance import geodesic
 from dotenv import load_dotenv
 from sklearn.neighbors import KDTree
+import pickle
+
 
 load_dotenv()
 
@@ -76,6 +78,13 @@ def build_spatial_index(G: nx):
     G.graph["spatial_graph"] = KDTree(node_list)
     G.graph["spatial_node_ids"] = node_ids
 
+def backend_export(G: nx, filepath: str = "data/network_cache.pkl"):
+    #pickle
+    os.makedirs(os.path.dirname(filepath), exist_ok= True)
+    with open(filepath, "wb") as file:
+        pickle.dump(G, file, protocol=5)
+
+
 if __name__ == "__main__":
     graph = load_osm_graph()    
     pos = {node: node for node in graph.nodes()}
@@ -90,4 +99,5 @@ if __name__ == "__main__":
     nx.draw(graph, pos= pos, node_size=0, width= 0.5)
     plt.show()
 
+    backend_export(graph)
     

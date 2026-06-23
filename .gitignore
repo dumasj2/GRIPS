@@ -17,14 +17,17 @@ backend/.env
 backend/venv/
 venv/
 
-# Raw OpenStreetMap Files (Stops large data blocks completely)
+# Raw OpenStreetMap Files 
 backend/data/*.osm.pbf
 backend/ma-osm/
 
-# Compiled Valhalla Assets (Stops Git history bloat)
+# Compiled Valhalla Assets
 backend/data/valhalla_tiles/
 backend/data/valhalla_tiles.tar
 backend/data/admin_data/
 backend/data/timezone_data/
 backend/data/*.txt
 backend/*.pkl
+
+# Graph Export
+backend/data/network_cache.pkl
