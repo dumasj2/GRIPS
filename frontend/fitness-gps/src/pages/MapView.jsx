@@ -20,22 +20,39 @@ function MapView() {
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
+        setError("");
         const { latitude, longitude } = position.coords;
 
-        setCoords({
-          latitude,
-          longitude,
-        });
+        setCoords({latitude, longitude,});
 
-        console.log(
-          "Live position:",
-          latitude,
-          longitude
-        );
+        console.log("Live position:", latitude, longitude);
       },
 
       (err) => {
-        setError(err.message);
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            setError(
+              "Location access was denied. Please enable location permissions in your browser and try again."
+            );
+            break;
+
+          case err.POSITION_UNAVAILABLE:
+            setError(
+              "Unable to determine your current location. Please make sure your device's location services are enabled."
+            );
+            break;
+
+          case err.TIMEOUT:
+            setError(
+              "Location request timed out. Please try again."
+            );
+            break;
+
+          default:
+            setError(
+              "An unexpected location error occurred."
+            );
+        }
       },
 
       {
@@ -74,6 +91,12 @@ function MapView() {
     setLoading(true);
 
     try {//The request send to the backend to generate a route
+      const controller = new AbortController();
+
+      const timeout = setTimeout(() => {
+        controller.abort();
+      }, 8000);
+
       const response = await fetch(
         "http://127.0.0.1:8000/route",// Link to backend on the local machine(Have only 1 uncommented)
         //"https://grips.onrender.com/route",// Link to backend endpoint(Have only 1 uncommented)
@@ -82,6 +105,7 @@ function MapView() {
           headers: {
             "Content-Type": "application/json",// Specifies requested content type as JSON
           },
+          signal: controller.signal,
           body: JSON.stringify({// Expected body of the request
             lat: coords.latitude,
             lon: coords.longitude,
@@ -89,6 +113,7 @@ function MapView() {
           }),
         }
       );
+      clearTimeout(timeout);
 
       if (!response.ok) {
         throw new Error(`Server returned ${response.status}`);// If the response is not ok, throw an error with the status code
@@ -97,19 +122,50 @@ function MapView() {
       const data = await response.json();// Parse the response as JSON
 
       console.log("Route data:", data);// Sends the route data to console for debugging
+
+      // Check that a route actually exists
+      if (!data.route || !data.route.features || data.route.features.length === 0) {
+        setError(
+          "No route could be found for the selected distance. Try another distance."
+        );
+
+        setRoute(null);
+        setCompletedRoute(null);
+        setUpcomingRoute(null);
+
+        return;
+      }
+
+      // Clear any previous errors
+      setError("");
       
       setRoute(data.route);
 
     } catch (err) {
       console.error(err);
-      setError(err.message);
+
+      if (err.name === "AbortError") {
+        setError(
+          "The server took too long to respond. Please try again."
+        );
+      } else {
+        setError(
+          "Unable to connect to the routing server."
+        );
+      }
+
+      setRoute(null);
+      setCompletedRoute(null);
+      setUpcomingRoute(null);
     } finally {
       setLoading(false);
     }
   };
 
   const updateRouteProgress = () => {//changes the color of the route on the map based on the user's location
-
+    if (!route || !route.features || route.features.length === 0) {
+      return;
+    }
     const coordinates =
       route.features[0].geometry.coordinates;
 
@@ -223,6 +279,15 @@ function MapView() {
         >
           {loading ? "Generating Route..." : "Generate Route"}
         </button>
+        {route && (
+          <button
+            onClick={handleGenerateRoute}
+            disabled={loading || !route}
+            className="px-4 py-2 bg-blue-300 text-blue-900 rounded"
+          >
+            Regenerate Route
+          </button>
+        )}
       </div>
 
       {coords && (
