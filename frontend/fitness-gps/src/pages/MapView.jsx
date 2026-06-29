@@ -95,7 +95,7 @@ function MapView() {
 
       const timeout = setTimeout(() => {
         controller.abort();
-      }, 8000);
+      }, 60000);//waits for a minute for a response from backend 
 
       const response = await fetch(
         "http://127.0.0.1:8000/route",// Link to backend on the local machine(Have only 1 uncommented)
