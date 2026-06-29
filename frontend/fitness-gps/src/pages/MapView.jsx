@@ -331,6 +331,7 @@ function MapView() {
         )}
         {completedRoute && (
           <GeoJSON
+            key={JSON.stringify(completedRoute)}
             data={completedRoute}
             style={{
               color: "green",
@@ -341,6 +342,7 @@ function MapView() {
 
         {upcomingRoute && (
           <GeoJSON
+            key={JSON.stringify(upcomingRoute)}
             data={upcomingRoute}
             style={{
               color: "blue",
