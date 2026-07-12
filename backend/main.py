@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from database import connection
 from sqlalchemy import text
 
 import network_graph
@@ -96,18 +95,24 @@ def ping():
         "message": "pong"
     }
 
-
 @app.get("/routes")
 def get_routes():
+    raise HTTPException(
+        status_code=503,
+        detail="Database is not configured for this deployment yet."
+    )
 
-    result = connection.execute(text("SELECT * FROM routes;"))
+#@app.get("/routes")
+#def get_routes():
 
-    routes = []
+    #result = connection.execute(text("SELECT * FROM routes;"))
 
-    for row in result:
-        routes.append(dict(row._mapping))
+    #routes = []
 
-    return routes
+    #for row in result:
+        #routes.append(dict(row._mapping))
+
+    #return routes
 
 @app.post("/route")
 def create_route(req: RouteRequest):
