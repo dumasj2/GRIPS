@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 import network_graph
 import route_generator
+import os
 
 app = FastAPI()
 
@@ -28,13 +29,25 @@ class RouteRequest(BaseModel):
 
 graph = None
 
+USE_FAKE_ROUTE = os.getenv("USE_FAKE_ROUTE", "false").lower() == "true"
+
 @app.on_event("startup")
 def startup_event():
     global graph
-    print("Loading OSM graph...")
-    graph = network_graph.load_osm_graph()
-    network_graph.build_spatial_index(graph)
-    print("OSM graph loaded.")
+
+    if USE_FAKE_ROUTE:
+        print("USE_FAKE_ROUTE=true, skipping OSM graph loading.")
+        graph = None
+        return
+
+    try:
+        print("Loading OSM graph...")
+        graph = network_graph.load_osm_graph()
+        network_graph.build_spatial_index(graph)
+        print("OSM graph loaded.")
+    except Exception as e:
+        print(f"Graph failed to load: {e}")
+        graph = None
 
 def validate_bounds(lat, lng):
     if not (42.30 <= lat <= 42.37 and -71.15 <= lng <= -71.05):
@@ -99,6 +112,17 @@ def get_routes():
 @app.post("/route")
 def create_route(req: RouteRequest):
     validate_bounds(req.lat, req.lon)
+
+    if USE_FAKE_ROUTE:
+        return {
+            "route": fake_route_geojson(req.lat, req.lon, req.miles),
+            "triangle_points": [],
+            "requested": {
+                "lat": req.lat,
+                "lon": req.lon,
+                "miles": req.miles,
+            },
+        }
 
     if graph is None:
         raise HTTPException(status_code=503, detail="Graph is not loaded yet.")

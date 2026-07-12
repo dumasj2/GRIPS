@@ -1,3 +1,7 @@
+# Root environment files
+.env
+.env.*
+
 # Root dependencies and logs
 node_modules/
 package-lock.json
@@ -7,6 +11,7 @@ route_preview.html
 frontend/fitness-gps/node_modules/
 frontend/fitness-gps/dist/
 frontend/fitness-gps/.env*
+
 
 # Backend Environment secrets
 backend/.env

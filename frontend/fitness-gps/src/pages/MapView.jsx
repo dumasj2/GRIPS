@@ -11,6 +11,8 @@ function MapView() {
   const [error, setError] = useState("");
   const [completedRoute, setCompletedRoute] = useState(null);
   const [upcomingRoute, setUpcomingRoute] = useState(null);
+  const [routeVersion,setRouteVersion] = useState(0);
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
   useEffect(() => {//constantly updates the user's location on the map
     if (!navigator.geolocation) {
@@ -98,8 +100,7 @@ function MapView() {
       }, 60000);//waits for a minute for a response from backend 
 
       const response = await fetch(
-        "http://127.0.0.1:8000/route",// Link to backend on the local machine(Have only 1 uncommented)
-        //"https://grips.onrender.com/route",// Link to backend endpoint(Have only 1 uncommented)
+        `${API_BASE_URL}/route`,
         {
           method: "POST",// Sends a post request to the backend
           headers: {
@@ -138,8 +139,11 @@ function MapView() {
 
       // Clear any previous errors
       setError("");
-      
+
+      setCompletedRoute(null);
+      setUpcomingRoute(null);
       setRoute(data.route);
+      setRouteVersion((v) => v + 1);
 
     } catch (err) {
       console.error(err);
@@ -163,6 +167,7 @@ function MapView() {
   };
 
   const updateRouteProgress = () => {//changes the color of the route on the map based on the user's location
+    console.log("Updating route progress...");
     if (!route || !route.features || route.features.length === 0) {
       return;
     }
@@ -329,9 +334,9 @@ function MapView() {
             }}
           />
         )}
-        {completedRoute && (
+        {/*{completedRoute && (
           <GeoJSON
-            key={JSON.stringify(completedRoute)}
+            key={`comnpleted-${routeVersion}`}
             data={completedRoute}
             style={{
               color: "green",
@@ -342,10 +347,19 @@ function MapView() {
 
         {upcomingRoute && (
           <GeoJSON
-            key={JSON.stringify(upcomingRoute)}
+            key={`upcoming-${routeVersion}`}
             data={upcomingRoute}
             style={{
               color: "blue",
+              weight: 6,
+            }}
+          />
+        )}*/}
+        {route && (
+          <GeoJSON
+            data={route}
+            style={{
+              color: "red",
               weight: 6,
             }}
           />
