@@ -33,7 +33,7 @@ USE_FAKE_ROUTE = os.getenv("USE_FAKE_ROUTE", "false").lower() == "true"
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
-    from database import connection
+    from database import engine
 else:
     connection = None
 
@@ -104,19 +104,19 @@ def ping():
 
 @app.get("/routes")
 def get_routes():
-    if connection is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Database is not configured for this deployment."
-        )
-
     try:
-        result = connection.execute(text("SELECT * FROM routes;"))
+        with engine.connect() as connection:
+            result = connection.execute(text("""
+                SELECT
+                    id,
+                    name,
+                    distance_miles,
+                    ST_AsGeoJSON(geom)::json AS geometry,
+                    created_at
+                FROM routes;
+            """))
 
-        routes = []
-
-        for row in result:
-            routes.append(dict(row._mapping))
+            routes = [dict(row._mapping) for row in result]
 
         return routes
 
