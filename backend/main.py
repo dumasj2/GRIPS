@@ -30,6 +30,13 @@ graph = None
 
 USE_FAKE_ROUTE = os.getenv("USE_FAKE_ROUTE", "false").lower() == "true"
 
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    from database import connection
+else:
+    connection = None
+
 @app.on_event("startup")
 def startup_event():
     global graph
@@ -97,10 +104,28 @@ def ping():
 
 @app.get("/routes")
 def get_routes():
-    raise HTTPException(
-        status_code=503,
-        detail="Database is not configured for this deployment yet."
-    )
+    if connection is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Database is not configured for this deployment."
+        )
+
+    try:
+        result = connection.execute(text("SELECT * FROM routes;"))
+
+        routes = []
+
+        for row in result:
+            routes.append(dict(row._mapping))
+
+        return routes
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database query failed: {e}"
+        )
+
 
 #@app.get("/routes")
 #def get_routes():
