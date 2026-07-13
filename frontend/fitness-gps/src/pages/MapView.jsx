@@ -12,7 +12,7 @@ function MapView() {
   const [completedRoute, setCompletedRoute] = useState(null);
   const [upcomingRoute, setUpcomingRoute] = useState(null);
   const [routeVersion,setRouteVersion] = useState(0);
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+  const API_BASE_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {//constantly updates the user's location on the map
     if (!navigator.geolocation) {
