@@ -1,3 +1,5 @@
+
+
 import { useState, useEffect } from "react";
 import { MapContainer, TileLayer, GeoJSON, CircleMarker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -12,6 +14,7 @@ function MapView() {
   const [completedRoute, setCompletedRoute] = useState(null);
   const [upcomingRoute, setUpcomingRoute] = useState(null);
   const [routeVersion,setRouteVersion] = useState(0);
+  const [progressVersion, setProgressVersion] = useState(0);
   const API_BASE_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {//constantly updates the user's location on the map
@@ -63,7 +66,8 @@ function MapView() {
         timeout: 5000,
       }
     );
-
+    
+    
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
@@ -100,7 +104,9 @@ function MapView() {
       }, 60000);//waits for a minute for a response from backend 
 
       const response = await fetch(
-        `${API_BASE_URL}/route`,
+        //`${API_BASE_URL}/route`,// Link to backend on the API(Have only 1 uncommented)
+        //"http://127.0.0.1:8000/route",// Link to backend on the local machine(Have only 1 uncommented)
+        "https://grips.onrender.com/route",// Link to backend endpoint(Have only 1 uncommented)
         {
           method: "POST",// Sends a post request to the backend
           headers: {
@@ -123,6 +129,9 @@ function MapView() {
       const data = await response.json();// Parse the response as JSON
 
       console.log("Route data:", data);// Sends the route data to console for debugging
+      
+
+      
 
       // Check that a route actually exists
       if (!data.route || !data.route.features || data.route.features.length === 0) {
@@ -144,6 +153,9 @@ function MapView() {
       setUpcomingRoute(null);
       setRoute(data.route);
       setRouteVersion((v) => v + 1);
+      
+
+      
 
     } catch (err) {
       console.error(err);
@@ -205,6 +217,9 @@ function MapView() {
     const upcoming = coordinates.slice(
       closestIndex
     );
+    console.log("Closest route point:", closestIndex);
+    console.log("Completed points:", completed.length);
+    console.log("Upcoming points:", upcoming.length);
 
     setCompletedRoute({
       type: "FeatureCollection",
@@ -237,6 +252,7 @@ function MapView() {
         },
       ],
     });
+    setProgressVersion((v) => v + 1);
   };
 
   const bostonBounds = [//Sets map boundaries
@@ -308,6 +324,7 @@ function MapView() {
       )}
       <div className="border-8 border-blue-900 rounded-xl overflow-hidden shadow-lg">
       <MapContainer
+        key={routeVersion}//regenerates the map when the route changes
         center={[42.336, -71.095]}
         zoom={15}
         minZoom={13}
@@ -334,9 +351,9 @@ function MapView() {
             }}
           />
         )}
-        {/*{completedRoute && (
+        {completedRoute && (
           <GeoJSON
-            key={`comnpleted-${routeVersion}`}
+            key={`comnpleted-${progressVersion}`}
             data={completedRoute}
             style={{
               color: "green",
@@ -347,19 +364,10 @@ function MapView() {
 
         {upcomingRoute && (
           <GeoJSON
-            key={`upcoming-${routeVersion}`}
+            key={`upcoming-${progressVersion}`}
             data={upcomingRoute}
             style={{
               color: "blue",
-              weight: 6,
-            }}
-          />
-        )}*/}
-        {route && (
-          <GeoJSON
-            data={route}
-            style={{
-              color: "red",
               weight: 6,
             }}
           />
