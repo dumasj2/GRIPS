@@ -300,15 +300,6 @@ function MapView() {
         >
           {loading ? "Generating Route..." : "Generate Route"}
         </button>
-        {route && (
-          <button
-            onClick={handleGenerateRoute}
-            disabled={loading || !route}
-            className="px-4 py-2 bg-blue-300 text-blue-900 rounded"
-          >
-            Regenerate Route
-          </button>
-        )}
       </div>
 
       {coords && (
@@ -356,8 +347,8 @@ function MapView() {
             key={`comnpleted-${progressVersion}`}
             data={completedRoute}
             style={{
-              color: "green",
-              weight: 6,
+              color: "grey",
+              weight: 4,
             }}
           />
         )}
@@ -368,7 +359,7 @@ function MapView() {
             data={upcomingRoute}
             style={{
               color: "blue",
-              weight: 6,
+              weight: 4,
             }}
           />
         )}
