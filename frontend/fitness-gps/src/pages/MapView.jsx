@@ -15,6 +15,8 @@ function MapView() {
   const [upcomingRoute, setUpcomingRoute] = useState(null);
   const [routeVersion,setRouteVersion] = useState(0);
   const [progressVersion, setProgressVersion] = useState(0);
+  const [eta, setEta] = useState("28 min");//hardocded dummy values, change later
+  const [safetyScore, setSafetyScore] = useState(87);//hardocded dummy values, change later
   const API_BASE_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {//constantly updates the user's location on the map
@@ -261,15 +263,15 @@ function MapView() {
   ];
 
   return (//This down makes all the UI visuals for the map view page
-    <div className="p-6 bg-gray-500 min-h-screen">
-      <h1 className="text-3xl text-blue-900 ml-22 font-bold mb-4">
+    <div className="p-6 bg-gray-400 min-h-screen">
+      <h1 className="text-3xl text-black ml-22 font-bold mb-4">
         G.R.I.P.S.
       </h1>
       <div className="mb-6 flex flex-col gap-4 max-w-md">
-        <h1 className="text-blue-900 italic mb-4">
+        <h1 className="text-black italic mb-4">
           Global Runner Intelligent Positioning System
         </h1>
-        <h1 className="text-blue-900 font-bold mb-4">
+        <h1 className="text-black font-bold mb-4">
           How many miles do you want to run?
         </h1>
         <input
@@ -277,9 +279,9 @@ function MapView() {
           placeholder="Distance (miles)"
           value={distance}
           onChange={(e) => setDistance(e.target.value)}
-          className="border p-2 rounded border-blue-900 text-blue-900"
+          className="border p-2 rounded border-blue-900 text-black"
         />
-        <h1 className="text-blue-900 font-bold mb-4">
+        <h1 className="text-black font-bold mb-4">
           Starting your run in a different location? Enter an address to change your starting point on the map:
         </h1>
         
@@ -289,14 +291,14 @@ function MapView() {
             placeholder="Enter an address"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            className="border p-2 rounded border-blue-900 text-blue-900"
+            className="border p-2 rounded border-blue-900 text-black"
           />
         </div>
 
         <button
           onClick={handleGenerateRoute}
           disabled={loading}
-          className="px-4 py-2 bg-slate-300 text-blue-900 rounded"
+          className="px-4 py-2 bg-slate-300 text-black rounded"
         >
           {loading ? "Generating Route..." : "Generate Route"}
         </button>
@@ -313,7 +315,39 @@ function MapView() {
           Error: {error}
         </p>
       )}
-      <div className="border-8 border-blue-900 rounded-xl overflow-hidden shadow-lg">
+      <div className="border-8 border-blue-900 bg-white rounded-xl overflow-hidden shadow-lg">
+
+
+          <h2 className="text-lg font-bold text-black mb-3">
+            Route Information
+          </h2>
+
+          <div className="mb-4">
+            <p className="text-sm text-gray-600">
+              Estimated Time
+            </p>
+
+            <p className="text-2xl font-bold text-black">
+              {eta}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm text-gray-600 mb-2">
+              Route Safety
+            </p>
+
+            <div className="w-full bg-gray-200 rounded-full h-4">
+              <div
+                className="bg-green-500 h-4 rounded-full transition-all duration-500"
+                style={{ width: `${safetyScore}%` }}
+              />
+            </div>
+
+            <p className="mt-2 text-center font-semibold text-green-700">
+              {safetyScore}/100
+            </p>
+        </div>
       <MapContainer
         key={routeVersion}//regenerates the map when the route changes
         center={[42.336, -71.095]}
