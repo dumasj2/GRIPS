@@ -95,6 +95,7 @@ if __name__ == "__main__":
     center = ((cords[1] + cords[3]) /2, (cords[0] + cords[2]) / 2)
     calc_dist = geodesic(center, (cords[1], cords[0])).meters
     print(f" Geopy Results: Origin Point {center} & Distace from center to edge: {calc_dist}")
+    print (f"number of edges: {graph.number_of_edges()} + number of nodes: {graph.number_of_nodes()}")
 
     nx.draw(graph, pos= pos, node_size=0, width= 0.5)
     plt.show()

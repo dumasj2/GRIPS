@@ -1,10 +1,12 @@
+import json
 import math
 import pickle
 import random
+import time
 from dotenv import load_dotenv
 import folium
 import networkx as nx
-from typing import List, Literal, Tuple
+from typing import List, Literal, Tuple, Optional
 import requests
 from sklearn.neighbors import KDTree
 import polyline
@@ -15,60 +17,41 @@ import numpy as np
 
 load_dotenv()
 VALHALLA_BASE_URL = os.environ.get("VALHALLA_URL")
+print(VALHALLA_BASE_URL)
 
 METERS_IN_A_MILE = 1609.34
 EARTH_RADIUS_IN_M = 6371008
 
-# TODO 1: Canidate Routes
-# TODO 1a:Generate 3 Routes
-# TODO 1b:Route Grader via shape + milage accuracy
-# TODO 2: Scale Milage better
-# TODO 3: Improve waypoint selection
-# TODO 3a: Esnure waypoint works at any node in the graph without failing waypoint finding
-# TODO 3b: Score waypoint via err and connectiveity
-# TODO 4: MVP ETA via segment meters over speedy type scaled by segment scalers via metadata for each segment
-# TODO 5: Score cost heuristic via distance + perference(derivied from metadata to manipulate Valhalla routing)
+
+# TODO post processing
+# TODO nx.single_source_dijkstra_path_length -> keep bests 3 -> run Vallhalla -> best via grading
+
 
 def generate_route(G: nx, start: Tuple[float, float], miles: float):
 
     # start is given as lon, Lat
     # Convert Miles to meters
+
     target_meters = miles * METERS_IN_A_MILE
     waypoint_meters = target_meters / (3.0 * get_w_pedestrian_boston(miles))
     start_node = find_starting_node(G, start)
     if not start_node:
         raise ValueError(f"Invalid Coordinates Given: {start}")
 
-    waypoint_node, waypoint_angle = find_waypoint(G, start, waypoint_meters)
-    if waypoint_node is None:
+    waypoints = find_waypoint(G, start, waypoint_meters)
+    if waypoints is None:
         raise ValueError(f"Could not find suitable waypoint")
 
-    tri_list = create_triangle_nodes(G, start, waypoint_node, target_meters)
-    print(f"Arc List: {tri_list}")
-
-    route = valhalla_route(tri_list)
-    result = valhalla_to_geojson(route)
-    grade = route_grader(result, target_meters)
-
-    best_grade = grade
-    best_result = result
-    best_tri_list = tri_list
+    best_grade = float("inf")
+    best_result = None
+    best_tri_list = None
 
     acceptable_error = 20.0
-    illegal_angles = [waypoint_angle]
 
-    # 360 / 15 = 24. Consider adjusting depedning on number of angle orientations
-    while best_grade > acceptable_error and len(illegal_angles) < 24:
+    # 360 / 45 = 8. Consider adjusting depedning on number of angle orientations
+    for waypoint in waypoints:
 
-        next_waypoint, next_angle = find_waypoint(
-            G, start, waypoint_meters, illegal_angles
-        )
-        if next_waypoint is None:
-            break
-
-        illegal_angles.append(next_angle)
-
-        new_tri_list = create_triangle_nodes(G, start, next_waypoint, target_meters)
+        new_tri_list = create_triangle_nodes(G, start, waypoint)
 
         new_route = valhalla_route(new_tri_list)
         new_result = valhalla_to_geojson(new_route)
@@ -80,24 +63,44 @@ def generate_route(G: nx, start: Tuple[float, float], miles: float):
             best_result = new_result
             best_tri_list = new_tri_list
 
+            if new_grade <= acceptable_error:
+                break
+
     print(
         f"Route distance: "
-        f"{result['features'][0]['properties']['distance_meters']:.0f} m"
+        f"{best_result['features'][0]['properties']['distance_meters']:.0f} m"
     )
 
     print(
-        f"Coordinate count: " f"{len(result['features'][0]['geometry']['coordinates'])}"
+        f"Coordinate count: "
+        f"{len(best_result['features'][0]['geometry']['coordinates'])}"
     )
 
-    print(
-        f"Grade: " f"{best_grade}"
-    )
+    print(f"Grade: " f"{best_grade}")
+
+    # TODO
+    try:
+        route_coords = best_result["features"][0]["geometry"]["coordinates"]
+        print(len(route_coords))
+        trace = valhalla_route(route_coords, "TRACE")
+        print(trace.keys())
+        print(trace["trip"].keys())
+        print(len(trace["trip"]["legs"]))
+        print(len(trace["trip"]["legs"][0]["maneuvers"]))
+
+        eta, best_result, score = post_processing(
+            best_result, trace, target_meters, G, best_tri_list
+        )
+
+    except RuntimeError as e:
+        print(f"Trace failed: {e}")
+
+    return best_result, best_tri_list, eta, score
 
 
-    return best_result, best_tri_list
-
-
-def valhalla_route(node_list: List[Tuple[float, float]], type: Literal["ROUTE", "TRACE"] = "ROUTE"):
+def valhalla_route(
+    node_list: List[Tuple[float, float]], type: Literal["ROUTE", "TRACE"] = "ROUTE"
+):
 
     unique_pass = [node_list[0]]
     for i in node_list[1:]:
@@ -106,7 +109,15 @@ def valhalla_route(node_list: List[Tuple[float, float]], type: Literal["ROUTE", 
 
     payload = {
         "costing": "pedestrian",
-        "costing_options": {
+    }
+
+    endpoint = ""
+
+    locations = []
+    if type == "ROUTE":
+        endpoint = "/route"
+
+        payload["costing_options"] = {
             "pedestrian": {
                 "use_ferry": 0,
                 "use_living_streets": 1,
@@ -114,30 +125,39 @@ def valhalla_route(node_list: List[Tuple[float, float]], type: Literal["ROUTE", 
                 "step_penalty": 5,
                 "alley_factor": 0.1,
                 "u_turn_penalty": 100000,
-                "maneuver_penalty": 500
+                "maneuver_penalty": 500,
             }
-        },
-        "units": "kilometres",
-    }
+        }
 
-    locations = []
-    if type == "ROUTE":
+        payload["units"] = "kilometres"
         for i, node in enumerate(unique_pass):
-            dict = {"lat": node[1], "lon": node[0]}
-            if i == 0 or i == len(unique_pass) - 1:
-                dict["type"] = "break"
-            else:
-                dict["type"] = "through"
+            di = {"lat": node[1], "lon": node[0]}
 
-            locations.append(dict)
+            if i == 0 or i == len(unique_pass) - 1:
+                di["type"] = "break"
+            else:
+                di["type"] = "through"
+
+            locations.append(di)
         payload["locations"] = locations
+    elif type == "TRACE":
+        endpoint = "/trace_route"
+        payload["shape_match"] = "walk_or_snap"
+        # lon/lat format
+        payload["shape"] = [{"lon": pas[0], "lat": pas[1]} for pas in unique_pass]
+
+    else:
+        raise RuntimeError("Invaid Request type: Please use ROUTE or TRACE")
 
     try:
-        response = requests.post(f"{VALHALLA_BASE_URL}/route", json=payload, timeout=20)
+        response = requests.post(
+            f"{VALHALLA_BASE_URL}{endpoint}", json=payload, timeout=20
+        )
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"Valhalla Request failed: {e}")
+        print(f"failed route: {VALHALLA_BASE_URL}{endpoint}")
         raise RuntimeError(f"Routing engine unreachable: {e}")
 
 
@@ -153,54 +173,28 @@ def get_w_pedestrian_boston(dist_in_miles: float):
             return 1.40
 
 
-def find_waypoint(G: nx, start: Tuple, disatnce: float, skip_angles: List[int] = None):
+def find_waypoint(G: nx, start: Tuple, distance: float):
 
-    if skip_angles is None:
-        skip_angles = []
-
-    angles = [a for a in range(0, 360, 15) if a not in skip_angles]
-    random.shuffle(angles)
-
-    best_node = None
-    best_dis = float("inf")
-    best_angle = -1
+    best = {}
     start_node = find_starting_node(G, start)
     print(f" Start Node: {start_node}")
-
-    for angle in angles:
-        projected_point = project_point(start, angle, disatnce)
-        projected_node = find_starting_node(G, projected_point)
-        print(f" angle= {angle}, projected={projected_point}, node= {projected_node}")
-        if projected_node == start_node:
-            print(" -> same as start, skipping")
-            continue
-        try:
-            path_length = nx.dijkstra_path_length(G, start_node, projected_node, weight="weight")
-            err = abs(path_length - disatnce)
-            print(f" -> path_length{err}")
-            if err < best_dis:
-                best_node = projected_node
-                best_dis = err
-                best_angle = angle
-        except nx.NetworkXNoPath:
-            continue
-        except Exception as e:
-            print(f" -> failed: {e}")
-   
-    print(
-        "Projected:",
-        projected_point,
-        "Actual:",
-        projected_node,
-        "Snap:",
-        Haversine_Distance(projected_point, projected_node)
+    distances = nx.single_source_dijkstra_path_length(
+        G, start_node, cutoff=distance * 1.25, weight="weight"
     )
 
-    return best_node, best_angle
+    for node, dis in distances.items():
+        err = abs(dis - distance)
+        sector = int(find_bearing(start_node, node) // 45)
+        if sector not in best or err < best[sector][1]:
+            best[sector] = (node, err)
+
+    return [node for node, _ in best.values()]
 
 
 def create_triangle_nodes(
-    G: nx, start: Tuple[float, float], end: Tuple[float, float], distance: float
+    G: nx,
+    start: Tuple[float, float],
+    end: Tuple[float, float],
 ):
     dx = end[0] - start[0]
     dy = end[1] - start[1]
@@ -234,6 +228,7 @@ def find_starting_node(G: nx, start: Tuple[float, float]):
     _, indices = G.graph["spatial_graph"].query([[start[0], start[1]]], k=1)
     nearest_index = indices[0][0]
     return G.graph["spatial_node_ids"][nearest_index]
+
 
 def project_point(node: Tuple[float, float], angle: float, distance: float):
     lon, lat = node
@@ -293,6 +288,21 @@ def Haversine_Distance(p1: Tuple[float, float], p2: Tuple[float, float]):
     return EARTH_RADIUS_IN_M * c
 
 
+def find_bearing(p1: Tuple[float, float], p2: Tuple[float, float]):
+    lat1, lon1 = math.radians(p1[1]), math.radians(p1[0])
+    lat2, lon2 = math.radians(p2[1]), math.radians(p2[0])
+
+    dlon = lon2 - lon1
+
+    x = math.sin(dlon) * math.cos(lat2)
+    y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(
+        dlon
+    )
+
+    angle = math.degrees(math.atan2(x, y))
+    return (angle + 360) % 360
+
+
 def route_grader(route: dict, target_distance: float):
     # Criteria: target distance error + connectivity
     actual_distance = route["features"][0]["properties"].get("distance_meters", 0)
@@ -324,9 +334,177 @@ def route_grader(route: dict, target_distance: float):
 
     return dist_err + shape_penalty
 
-def eta(route: dict):
+
+# TODO Finish
+def post_processing(route: dict, trace: dict, distance: float, G: nx, waypoints: List):
+
+    del waypoints[0]
+    del waypoints[-1]
+
+    eta = create_eta(trace)
+    smoothed_route = route_optimization(route, G, waypoints)
+    route_quality = final_route_quality(smoothed_route, distance, G)
+    return eta, smoothed_route, route_quality
+
+
+def create_eta(trace: dict, speed: Literal["Walking", "Running"] = "Walking"):
+    rate = 0
+    match speed:
+        case "Running":
+            rate = 10.0
+        case "Walking":
+            rate = 5.0
+        case _:
+            raise ValueError("Invalid speed mode")
+
+    print(f"Type check {type(trace)}")
+
+    raw_length = trace["trip"]["summary"]["length"]
+
+    eta = (raw_length / rate) * 60
+
+    print(f"eta: {eta}")
+    return eta
+    # return sum(edge.distance / rate for edge in trace["edges"]) * 60
+
+
+def route_optimization(route: dict, G: nx, waypoints: List):
     coords = route["features"][0]["geometry"]["coordinates"]
 
+    for waypoint in waypoints:
+        current_idx = get_current_pos(waypoint, coords)
+
+        window_points = max(
+            5,
+            int(len(coords) / 27.5)
+        )
+
+        start = max(0, current_idx - window_points)
+        end = min(len(coords), current_idx + (window_points + 1))
+
+        local_window = coords[start:end]
+
+        # Comparre distance between A - E vs AB - BC - CD - DE
+        start_to_end_distance = Haversine_Distance(local_window[0], local_window[-1])
+        actual_distance = 0
+
+        for i in range(len(local_window) - 1):
+            actual_distance += Haversine_Distance(local_window[i], local_window[i + 1])
+
+        ratio = (
+            actual_distance / start_to_end_distance
+            if start_to_end_distance > 0
+            else float("inf")
+        )
+
+        # Analyze each angle bearing
+        bearings = []
+        for i in range(len(local_window) - 1):
+            bearings.append(find_bearing(local_window[i], local_window[i + 1]))
+
+        heading_change = []
+        for i in range(len(bearings) - 1):
+            diff = abs(bearings[i] - bearings[i + 1])
+            diff = min(diff, 360 - diff)
+            heading_change.append(diff)
+
+        print(f"heading change {max(heading_change)}")
+
+        if ratio > 1.5:
+            start_node = find_starting_node(G, local_window[0])
+            end_node = find_starting_node(G, local_window[-1])
+
+            try:
+                path = nx.shortest_path(G, start_node, end_node, weight="weight")
+
+                repair_window = list(path)
+
+                coords = coords[:start] + repair_window + coords[end:]
+                route["features"][0]["geometry"]["coordinates"] = coords
+
+                print(f"new coords: {coords[:5]}")
+
+                
+            except nx.NetworkXNoPath:
+                print("network X no path error")
+                pass
+        elif max(heading_change, default=0) > 90:
+            start_node = find_starting_node(G, local_window[0])
+            end_node = find_starting_node(G, local_window[-1])
+
+            try:
+                bearing  = find_bearing(start_node, end_node)
+                length = nx.dijkstra_path_length(G, start_node, end_node, weight="weight")
+                half_way = length / 2
+
+                new_w = project_point(start_node, bearing, half_way)
+                new_node = find_starting_node(G, new_w)
+
+                path1 = nx.shortest_path(G, start_node, new_node, weight="weight")
+                path2 = nx.shortest_path(G, new_node, end_node, weight="weight")
+
+                path = path1[:-1] + path2
+
+                repair_window = list(path)
+
+                coords = coords[:start] + repair_window + coords[end:]
+                route["features"][0]["geometry"]["coordinates"] = coords
+
+                # print(f"new coords: {coords[:5]}")
+                # print("start:", start_node)
+                # print("end:", end_node)
+                # print("bearing:", bearing)
+                # print("halfway:", half_way)
+                # print("projected waypoint:", new_w)
+                # print("new node:", new_node)
+                # print("old window length:", len(local_window))
+                # print("repair length:", len(repair_window))
+                
+            except nx.NetworkXNoPath:
+                print("network X no path error")
+                pass
+
+    return route
+
+
+def get_current_pos(waypoint, route):
+    current_closest_idx = 0
+    current_closest = Haversine_Distance(route[current_closest_idx], waypoint)
+
+    for current_idx, cord in enumerate(route):
+        current_dist = Haversine_Distance(cord, waypoint)
+
+        if current_dist < current_closest:
+            current_closest = current_dist
+            current_closest_idx = current_idx
+
+    return current_closest_idx
+
+
+def final_route_quality(route: dict, target_distance: float, G: nx):
+    raw_grade = route_grader(route, target_distance)
+
+    coords = route["features"][0]["geometry"]["coordinates"]
+    total_penalty = 0.0
+
+    for i in range(len(coords) - 1):
+        u = find_starting_node(G, tuple(coords[i]))
+        v = find_starting_node(G, tuple(coords[i + 1]))
+
+        if G.has_edge(u, v):
+            edge = G[u][v]
+        elif G.has_edge(v, u):
+            edge = G[v][u]
+        else:
+            continue
+
+        total_penalty += edge["weight"]
+
+    penalty_score = 20 * (
+        total_penalty / route["features"][0]["properties"]["distance_meters"]
+    )
+
+    return penalty_score + raw_grade
 
 
 def visualize_route(route: dict, start: Tuple[float, float], tri_list: List = None):
@@ -377,11 +555,20 @@ def visualize_route(route: dict, start: Tuple[float, float], tri_list: List = No
 
 
 if __name__ == "__main__":
+    start_t = time.perf_counter()
+
     with open("data/network_cache.pkl", "rb") as f:
         G = pickle.load(f)
-    
+
     start_point = (-71.095, 42.336)  # (lon, lat)
-    target_miles = 1.5
-    route, tri_list = generate_route(G, start_point, target_miles)
+    target_miles = 5.75
+    route, tri_list, eta, score = generate_route(G, start_point, target_miles)
+
+    print(f"eta: {eta}")
+    print(f"score: {score}")
 
     visualize_route(route, start_point, tri_list=tri_list)
+
+    end_t = time.perf_counter()
+
+    print(f"Time elasped: {end_t - start_t}")
