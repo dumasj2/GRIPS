@@ -158,7 +158,7 @@ def create_route(req: RouteRequest):
         raise HTTPException(status_code=503, detail="Graph is not loaded yet.")
 
     try:
-        route_geojson, tri_list = route_generator.generate_route(
+        route_geojson, tri_list, eta, score = route_generator.generate_route(
             graph,
             (req.lon, req.lat), 
             req.miles
@@ -167,6 +167,8 @@ def create_route(req: RouteRequest):
         return {
             "route": route_geojson,
             "triangle_points": tri_list,
+            "eta_minutes": round(eta, 1) if eta is not None else None,
+            "safety_score": round(score, 1) if score is not None else None,
             "requested": {
                 "lat": req.lat,
                 "lon": req.lon,
