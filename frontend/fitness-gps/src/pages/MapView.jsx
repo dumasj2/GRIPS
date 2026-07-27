@@ -1,8 +1,10 @@
 
 
 import { useState, useEffect } from "react";
-import { MapContainer, TileLayer, GeoJSON, CircleMarker } from "react-leaflet";
+import { MapContainer, TileLayer, GeoJSON, CircleMarker, Marker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import "leaflet-rotatedmarker";
 
 function MapView() {
   const [distance, setDistance] = useState("");
@@ -17,9 +19,24 @@ function MapView() {
   const [progressVersion, setProgressVersion] = useState(0);
   const [heading, setHeading] = useState(0);
   const [previousCoords, setPreviousCoords] = useState(null);
-  const [eta, setEta] = useState("28 min");//hardocded dummy values, change later
-  const [safetyScore, setSafetyScore] = useState(87);//hardocded dummy values, change later
+  const [eta, setEta] = useState(null);
+  const [safetyScore, setSafetyScore] = useState(null);
   const API_BASE_URL = import.meta.env.VITE_API_URL;
+
+  const arrowIcon = L.divIcon({
+    className: "",
+    html: `
+      <div style="
+        font-size: 30px;
+        color: blue;
+        transform: translate(-50%, -50%);
+      ">
+        ▲
+      </div>
+    `,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  });
 
   useEffect(() => {//constantly updates the user's location on the map
     if (!navigator.geolocation) {
@@ -57,7 +74,9 @@ function MapView() {
         });
 
         console.log("Live position:", latitude, longitude);
-        console.log("Heading:", heading);
+        if (previousCoords) {
+          console.log("Heading:", angle);
+        }
       },
 
       (err) => {
@@ -157,7 +176,11 @@ function MapView() {
 
       console.log("Route data:", data);// Sends the route data to console for debugging
       
+      setEta(data.eta_minutes);
+      setSafetyScore(data.safety_score);
 
+      console.log("ETA:", data.eta_minutes);
+      console.log("Safety Score:", data.safety_score);
       
 
       // Check that a route actually exists
@@ -340,9 +363,8 @@ function MapView() {
           Error: {error}
         </p>
       )}
-      <div className="border-8 border-blue-900 bg-white rounded-xl overflow-hidden shadow-lg">
-        {route && (
-        <div className="rounded-xl overflow-hidden shadow-lg">
+              {route && (
+        <div className="border-8 border-blue-900 rounded-xl overflow-hidden shadow-lg">
           <h2 className="text-lg font-bold text-black mb-3">
             Route Information
           </h2>
@@ -353,7 +375,7 @@ function MapView() {
             </p>
 
             <p className="text-2xl font-bold text-black">
-              {eta}
+              {eta !== null ? `${eta} min` : "--"}
             </p>
           </div>
 
@@ -375,6 +397,8 @@ function MapView() {
         </div>
       </div>
       )}
+      <div className="border-8 border-blue-900 bg-white rounded-xl overflow-hidden shadow-lg">
+
       <MapContainer
         key={routeVersion}//regenerates the map when the route changes
         center={[42.336, -71.095]}
@@ -390,17 +414,14 @@ function MapView() {
         />
         
         {coords && (
-          <CircleMarker
-            center={[
+          <Marker
+            position={[
               coords.latitude,
               coords.longitude,
             ]}
-            radius={8}
-            pathOptions={{
-              color: "blue",
-              fillColor: "blue",
-              fillOpacity: 1,
-            }}
+            icon={arrowIcon}
+            rotationAngle={heading}
+            rotationOrigin="center"
           />
         )}
         {completedRoute && (
