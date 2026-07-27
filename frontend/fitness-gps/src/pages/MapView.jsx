@@ -1,6 +1,4 @@
-
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MapContainer, TileLayer, GeoJSON, CircleMarker, Marker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -15,11 +13,14 @@ function MapView() {
   const [error, setError] = useState("");
   const [completedRoute, setCompletedRoute] = useState(null);
   const [upcomingRoute, setUpcomingRoute] = useState(null);
+  const [startRoute, setStartRoute] = useState(null);
   const [routeVersion,setRouteVersion] = useState(0);
   const [progressVersion, setProgressVersion] = useState(0);
   const [heading, setHeading] = useState(0);
-  const [previousCoords, setPreviousCoords] = useState(null);
+  const previousCoords = useRef(null);
+  const markerRef = useRef(null);
   const [eta, setEta] = useState(null);
+  const [originalEta, setOriginalEta] = useState(null);
   const [safetyScore, setSafetyScore] = useState(null);
   const API_BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -28,7 +29,8 @@ function MapView() {
     html: `
       <div style="
         font-size: 30px;
-        color: blue;
+        color: white;
+        -webkit-text-stroke: 2px blue;
         transform: translate(-50%, -50%);
       ">
         ▲
@@ -49,20 +51,22 @@ function MapView() {
         setError("");
 
         const { latitude, longitude } = position.coords;
+        console.log("Previous:", previousCoords.current);
 
         // Calculate heading from previous GPS position
-        if (previousCoords) {
-          const deltaLat = latitude - previousCoords.latitude;
-          const deltaLng = longitude - previousCoords.longitude;
+        if (previousCoords.current) {
+          const deltaLat = latitude - previousCoords.current.latitude;
+          const deltaLng = longitude - previousCoords.current.longitude;
 
           const angle =
             Math.atan2(deltaLng, deltaLat) * (180 / Math.PI);
 
+          console.log("Heading:", angle);
           setHeading(angle);
         }
 
         // Save current location as previous for next update
-        setPreviousCoords({
+        previousCoords.current=({
           latitude,
           longitude,
         });
@@ -74,9 +78,6 @@ function MapView() {
         });
 
         console.log("Live position:", latitude, longitude);
-        if (previousCoords) {
-          console.log("Heading:", angle);
-        }
       },
 
       (err) => {
@@ -108,8 +109,8 @@ function MapView() {
 
       {
         enableHighAccuracy: true,
-        maximumAge: 1000,
-        timeout: 5000,
+        maximumAge: 0,
+        timeout: 6000,
       }
     );
     
@@ -125,6 +126,12 @@ function MapView() {
     updateRouteProgress();
 
   }, [coords, route]);
+
+  useEffect(() => {//updates the triangles rotation on the map whenever it changes
+    if (markerRef.current) {
+      markerRef.current.setRotationAngle(heading);
+    }
+  }, [heading]);
 
   const handleGenerateRoute = async () => {//Gets called when user clicks generate route button
     setError("");
@@ -177,6 +184,7 @@ function MapView() {
       console.log("Route data:", data);// Sends the route data to console for debugging
       
       setEta(data.eta_minutes);
+      setOriginalEta(data.eta_minutes);
       setSafetyScore(data.safety_score);
 
       console.log("ETA:", data.eta_minutes);
@@ -267,9 +275,36 @@ function MapView() {
     const upcoming = coordinates.slice(
       closestIndex
     );
+
+    const start = coordinates.slice(
+      0,
+      Math.min(5, coordinates.length)
+    );
+
+    const progress =
+      closestIndex / (coordinates.length - 1);
+
+    const remainingEta =
+      originalEta * (1 - progress);
+
+    setEta(Math.max(0, remainingEta).toFixed(1));
+
     console.log("Closest route point:", closestIndex);
     console.log("Completed points:", completed.length);
     console.log("Upcoming points:", upcoming.length);
+
+    setStartRoute({
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: start,
+          },
+        },
+      ],
+    });
 
     setCompletedRoute({
       type: "FeatureCollection",
@@ -414,13 +449,12 @@ function MapView() {
         
         {coords && (
           <Marker
+            ref={markerRef}
             position={[
               coords.latitude,
               coords.longitude,
             ]}
             icon={arrowIcon}
-            rotationAngle={heading}
-            rotationOrigin="center"
           />
         )}
         {completedRoute && (
@@ -441,6 +475,16 @@ function MapView() {
             style={{
               color: "blue",
               weight: 4,
+            }}
+          />
+        )}
+        {startRoute && (
+          <GeoJSON
+            key={`start-${progressVersion}`}
+            data={startRoute}
+            style={{
+              color: "green",
+              weight: 10,
             }}
           />
         )}
