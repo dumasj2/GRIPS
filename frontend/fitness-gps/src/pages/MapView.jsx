@@ -423,7 +423,7 @@ function MapView() {
             <div className="w-full bg-gray-200 rounded-full h-4">
               <div
                 className="bg-green-500 h-4 rounded-full transition-all duration-500"
-                style={{ width: `${safetyScore}%` }}
+                style={{ width: `${(safetyScore / 50) * 100}%` }}
               />
             </div>
 
