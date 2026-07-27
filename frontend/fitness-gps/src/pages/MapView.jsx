@@ -15,6 +15,8 @@ function MapView() {
   const [upcomingRoute, setUpcomingRoute] = useState(null);
   const [routeVersion,setRouteVersion] = useState(0);
   const [progressVersion, setProgressVersion] = useState(0);
+  const [heading, setHeading] = useState(0);
+  const [previousCoords, setPreviousCoords] = useState(null);
   const [eta, setEta] = useState("28 min");//hardocded dummy values, change later
   const [safetyScore, setSafetyScore] = useState(87);//hardocded dummy values, change later
   const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -28,11 +30,34 @@ function MapView() {
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         setError("");
+
         const { latitude, longitude } = position.coords;
 
-        setCoords({latitude, longitude,});
+        // Calculate heading from previous GPS position
+        if (previousCoords) {
+          const deltaLat = latitude - previousCoords.latitude;
+          const deltaLng = longitude - previousCoords.longitude;
+
+          const angle =
+            Math.atan2(deltaLng, deltaLat) * (180 / Math.PI);
+
+          setHeading(angle);
+        }
+
+        // Save current location as previous for next update
+        setPreviousCoords({
+          latitude,
+          longitude,
+        });
+
+        // Update the user's current position
+        setCoords({
+          latitude,
+          longitude,
+        });
 
         console.log("Live position:", latitude, longitude);
+        console.log("Heading:", heading);
       },
 
       (err) => {
@@ -316,8 +341,8 @@ function MapView() {
         </p>
       )}
       <div className="border-8 border-blue-900 bg-white rounded-xl overflow-hidden shadow-lg">
-
-
+        {route && (
+        <div className="rounded-xl overflow-hidden shadow-lg">
           <h2 className="text-lg font-bold text-black mb-3">
             Route Information
           </h2>
@@ -348,6 +373,8 @@ function MapView() {
               {safetyScore}/100
             </p>
         </div>
+      </div>
+      )}
       <MapContainer
         key={routeVersion}//regenerates the map when the route changes
         center={[42.336, -71.095]}
