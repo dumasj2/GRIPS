@@ -363,8 +363,9 @@ function MapView() {
           Error: {error}
         </p>
       )}
-              {route && (
-        <div className="border-8 border-blue-900 rounded-xl overflow-hidden shadow-lg">
+      <div className="border-8 border-blue-900 bg-white rounded-xl overflow-hidden shadow-lg">
+        {route && (
+        <div className="rounded-xl overflow-hidden shadow-lg">
           <h2 className="text-lg font-bold text-black mb-3">
             Route Information
           </h2>
@@ -397,8 +398,6 @@ function MapView() {
         </div>
       </div>
       )}
-      <div className="border-8 border-blue-900 bg-white rounded-xl overflow-hidden shadow-lg">
-
       <MapContainer
         key={routeVersion}//regenerates the map when the route changes
         center={[42.336, -71.095]}
