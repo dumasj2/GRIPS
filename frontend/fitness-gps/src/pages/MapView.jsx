@@ -28,10 +28,14 @@ function MapView() {
     className: "",
     html: `
       <div style="
-        font-size: 30px;
-        color: white;
-        -webkit-text-stroke: 2px blue;
-        transform: translate(-50%, -50%);
+        width:30px;
+        height:30px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:28px;
+        color:white;
+        -webkit-text-stroke:2px blue;
       ">
         ▲
       </div>
@@ -455,6 +459,7 @@ function MapView() {
               coords.longitude,
             ]}
             icon={arrowIcon}
+            rotationOrigin="center center"
           />
         )}
         {completedRoute && (
