@@ -417,7 +417,7 @@ function MapView() {
 
           <div>
             <p className="text-sm text-gray-600 mb-2">
-              Route Safety
+              Route Quality Score
             </p>
 
             <div className="w-full bg-gray-200 rounded-full h-4">
@@ -428,7 +428,7 @@ function MapView() {
             </div>
 
             <p className="mt-2 text-center font-semibold text-green-700">
-              {safetyScore}/100
+              {safetyScore}/50
             </p>
         </div>
       </div>
