@@ -189,7 +189,7 @@ function MapView() {
       
       setEta(data.eta_minutes);
       setOriginalEta(data.eta_minutes);
-      setSafetyScore(data.safety_score);
+      setSafetyScore(100-data.safety_score);
 
       console.log("ETA:", data.eta_minutes);
       console.log("Safety Score:", data.safety_score);
@@ -239,7 +239,24 @@ function MapView() {
       setLoading(false);
     }
   };
+    function formatEta(minutes) {
+      if (minutes == null) return "--";
 
+      const totalMinutes = Math.round(Number(minutes));
+
+      const hours = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+
+      if (hours === 0) {
+        return `${mins} min`;
+      }
+
+      if (mins === 0) {
+        return `${hours} hr`;
+      }
+
+      return `${hours} hr ${mins} min`;
+    }
   const updateRouteProgress = () => {//changes the color of the route on the map based on the user's location
     console.log("Updating route progress...");
     if (!route || !route.features || route.features.length === 0) {
@@ -356,7 +373,7 @@ function MapView() {
       </h1>
       <div className="mb-6 flex flex-col gap-4 max-w-md">
         <h1 className="text-black italic mb-4">
-          Global Runner Intelligent Positioning System
+          Global Runner Interface Positioning System
         </h1>
         <h1 className="text-black font-bold mb-4">
           How many miles do you want to run?
@@ -368,19 +385,7 @@ function MapView() {
           onChange={(e) => setDistance(e.target.value)}
           className="border p-2 rounded border-blue-900 text-black"
         />
-        <h1 className="text-black font-bold mb-4">
-          Starting your run in a different location? Enter an address to change your starting point on the map:
-        </h1>
-        
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            placeholder="Enter an address"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            className="border p-2 rounded border-blue-900 text-black"
-          />
-        </div>
+
 
         <button
           onClick={handleGenerateRoute}
@@ -390,12 +395,6 @@ function MapView() {
           {loading ? "Generating Route..." : "Generate Route"}
         </button>
       </div>
-
-      {coords && (
-        <p className="mb-4">
-          Location: {coords.latitude}, {coords.longitude}
-        </p>
-      )}
 
       {error && (
         <p className="mb-4 text-red-600">
@@ -415,7 +414,7 @@ function MapView() {
             </p>
 
             <p className="text-2xl font-bold text-black">
-              {eta !== null ? `${eta} min` : "--"}
+              {formatEta(eta)}
             </p>
           </div>
 
@@ -427,12 +426,12 @@ function MapView() {
             <div className="w-full bg-gray-200 rounded-full h-4">
               <div
                 className="bg-green-500 h-4 rounded-full transition-all duration-500"
-                style={{ width: `${(safetyScore / 50) * 100}%` }}
+                style={{ width: `${(safetyScore / 50) * 50}%` }}
               />
             </div>
 
             <p className="mt-2 text-center font-semibold text-green-700">
-              {safetyScore}/50
+              {safetyScore}/100
             </p>
         </div>
       </div>
